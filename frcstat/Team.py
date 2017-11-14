@@ -56,7 +56,7 @@ class Team:
             
             
         #Team Awads Requests
-        teamAwardName = "{}-events".format(self.teamCode) #common name
+        teamAwardName = "{}-awards".format(self.teamCode) #common name
         teamAwardRequest = _Singleton_TBA_Client.makeRequest("team/{}/awards".format(self.teamCode) , validityData[teamAwardName])
         self.awardData = None
         if teamAwardRequest == None: #Use saved values
