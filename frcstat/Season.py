@@ -5,14 +5,14 @@ _Singleton_TBA_Client = None
 
 
 class Season:
-    def __init__(self , year , localDataOnly = False):
-        """
-            year - Season year
-            localDataOnly - Set True if offline and know you have all the data cached
-        """
+    def __init__(self , year , cacheRefreshAggression = 1):
+        '''
+            Data Loaded from TBA
+                self.events
+        '''
         self.year = year
         self.validityFile = str(year) + "-valid"
-        self.loadData(localDataOnly)
+        self.loadData(cacheRefreshAggression)
         
 
 
@@ -67,26 +67,12 @@ class Season:
     def getComponentOPRLabels(self):
         pass
         
-    def loadData(self , localDataOnly):
-        if localDataOnly:
-            eventObjName = "{}-events".format(str(self.year))
-            self.events = _Singleton_TBA_Client.readSeasonData(eventObjName)
-            return
-            
-        #First get modified data to check if update needed
+    def loadData(self , cacheRefreshAggression):
         validityData = _Singleton_TBA_Client.dictToDefaultDict(_Singleton_TBA_Client.readSeasonData(self.validityFile) , lambda:None)
         
-        #Events in a year requests
-        eventObjName = "{}-events".format(str(self.year)) #common name
-        eventRequest = _Singleton_TBA_Client.makeRequest("events/{}".format(str(self.year)) , validityData[eventObjName])
-        self.events = None
-        if eventRequest == None: #Use saved values
-            self.events = _Singleton_TBA_Client.readSeasonData(eventObjName)
-        else: #Use values from server
-            self.events = eventRequest[0] #Assign data to member object
-            validityData[eventObjName] = eventRequest[1] #Write the If-Modified-Since header to our validity data
-            _Singleton_TBA_Client.writeSeasonData(eventObjName , self.events) #Write member object data to file
-        
+        eventObjName = "{}-data".format(self.eventCode)
+        eventRequest = "event/{}".format(self.eventCode)
+        self.events = _Singleton_TBA_Client.makeSmartRequest(eventObjName , eventRequest , validityData , self , cacheRefreshAggression)
             
         _Singleton_TBA_Client.writeSeasonData(self.validityFile , validityData) #Write validity object to file
         

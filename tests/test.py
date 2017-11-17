@@ -1,20 +1,14 @@
 import frcstat as frc
 import time
 
-s1 = time.time()
-s2016 = frc.Season(2016)
-e1 = time.time()
+cc = frc.Event("2017new" , 1)
+oprs = cc.scoreMetricFromPattern()
+eq = "B1_P + B2_P + B3_P = BS - (score_breakdown_blue_foulPoints + score_breakdown_blue_kPaBonusPoints + score_breakdown_blue_teleopTakeoffPoints + score_breakdown_blue_autoMobilityPoints);"
+eq += "R1_P + R2_P + R3_P = RS - (score_breakdown_red_foulPoints + score_breakdown_red_kPaBonusPoints + score_breakdown_red_teleopTakeoffPoints + score_breakdown_red_autoMobilityPoints)"
 
-s2 = time.time()
-s22016 = frc.Season(2016 , True)
-e2 = time.time()
+powerRating = cc.scoreMetricFromPattern(eq)
 
-s3 = time.time()
-s2017 = frc.Season(2012)
-e3 = time.time()
-
-
-print(e1 - s1)
-print(e2 - s2)
-print(e3 - s3)
-
+with open("power.csv" , 'w') as fp:
+    for t in cc.getTeamList():
+        fp.write("{},{},{}\n".format(t , str(oprs["{}1".format(t)]) , str(powerRating["{}_P".format(t)])))
+        

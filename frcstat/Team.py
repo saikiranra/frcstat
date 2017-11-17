@@ -1,71 +1,55 @@
 _Singleton_TBA_Client = None
 
 class Team:
-    def __init__(self , number , localDataOnly = False):
-        """
-            number - Team Number
-            localDataOnly - Set True if offline and know you have all the data cached
-        """
-        self.number = number
-        self.teamCode = "frc{}".format(str(number))
-        self.validityFile = str(number) + "-valid"
-        self.loadData(localDataOnly)
+    def __init__(self , number , cacheRefreshAggression = 1):
+        '''
+            Data Loaded from TBA
+                self.teamData
+                self.eventData
+                self.awardData
+        '''
+        if type(number) == str:
+            self.number = int(float(number.replace("frc" , "")))
+        else:
+            self.number = number
+        self.teamCode = "frc{}".format(str(self.number))
+        self.validityFile = str(self.number) + "-valid"
+        self.loadData(cacheRefreshAggression)
+        
+    def getAwardsByYear(self , year):
+        out = []
+        for award in self.awardData:
+            if year == award["year"]:
+                out.append(award)
+        return out
+        
+    def getEventsByYear(self , year):
+        out = []
+        for event in self.eventData:
+            if year == event["year"]:
+                out.append(event)
+        return out
 
-    def loadData(self , localDataOnly):
+        
+    def loadData(self , cacheRefreshAggression):
         """
-            self.teamData
-            self.teamAwards
-            self.teamEvents
+            
         """
-        if localDataOnly:
-            teamDataName = "{}-data".format(self.teamCode)
-            self.teamData = _Singleton_TBA_Client.readTeamData(teamDataName)
-            
-            teamEventName = "{}-events".format(self.teamCode)
-            self.eventData = _Singleton_TBA_Client.readTeamData(teamEventName)
-            
-            teamAwardName = "{}-events".format(self.teamCode)
-            self.awardData = _Singleton_TBA_Client.readTeamData(teamAwardName)
-            return 
-            
+        
         #First get modified data to check if update needed
         validityData = _Singleton_TBA_Client.dictToDefaultDict(_Singleton_TBA_Client.readTeamData(self.validityFile) , lambda:None)
         
-        #Team Data Requests
-        teamDataName = "{}-data".format(self.teamCode) #common name
-        teamDataRequest = _Singleton_TBA_Client.makeRequest("team/{}".format(self.teamCode) , validityData[teamDataName])
-        self.teamData = None
-        if teamDataRequest == None: #Use saved values
-            self.teamData = _Singleton_TBA_Client.readTeamData(teamDataName)
-        else: #Use values from server
-            self.teamData = teamDataRequest[0] #Assign data to member object
-            validityData[teamDataName] = teamDataRequest[1] #Write the If-Modified-Since header to our validity data
-            _Singleton_TBA_Client.writeTeamData(teamDataName , self.teamData) #Write member object data to file
-            
-            
-        #Team Events Requests
-        teamEventName = "{}-events".format(self.teamCode) #common name
-        teamEventRequest = _Singleton_TBA_Client.makeRequest("team/{}/events".format(self.teamCode) , validityData[teamEventName])
-        self.eventData = None
-        if teamEventRequest == None: #Use saved values
-            self.eventData = _Singleton_TBA_Client.readTeamData(teamEventName)
-        else: #Use values from server
-            self.eventData = teamEventRequest[0] #Assign data to member object
-            validityData[teamEventName] = teamEventRequest[1] #Write the If-Modified-Since header to our validity data
-            _Singleton_TBA_Client.writeTeamData(teamEventName , self.eventData) #Write member object data to file
-            
-            
-        #Team Awads Requests
-        teamAwardName = "{}-events".format(self.teamCode) #common name
-        teamAwardRequest = _Singleton_TBA_Client.makeRequest("team/{}/awards".format(self.teamCode) , validityData[teamAwardName])
-        self.awardData = None
-        if teamAwardRequest == None: #Use saved values
-            self.awardData = _Singleton_TBA_Client.readTeamData(teamAwardName)
-        else: #Use values from server
-            self.awardData = teamAwardRequest[0] #Assign data to member object
-            validityData[teamAwardName] = teamAwardRequest[1] #Write the If-Modified-Since header to our validity data
-            _Singleton_TBA_Client.writeTeamData(teamAwardName , self.awardData) #Write member object data to file
+        teamDataName = "{}-data".format(self.teamCode)
+        teamDataRequest = "team/{}".format(self.teamCode)
+        self.teamData = _Singleton_TBA_Client.makeSmartRequest(teamDataName , teamDataRequest , validityData , self , cacheRefreshAggression)
         
+        teamEventName = "{}-events".format(self.teamCode) #common name
+        teamEventRequest = "team/{}/events".format(self.teamCode)
+        self.eventData = _Singleton_TBA_Client.makeSmartRequest(teamEventName , teamEventRequest , validityData , self , cacheRefreshAggression)
+        
+        teamAwardName = "{}-awards".format(self.teamCode) #common name
+        teamAwardRequest = "team/{}/awards".format(self.teamCode)
+        self.awardData = _Singleton_TBA_Client.makeSmartRequest(teamAwardName , teamAwardRequest , validityData , self , cacheRefreshAggression)   
             
         _Singleton_TBA_Client.writeTeamData(self.validityFile , validityData) #Write validity object to file   
 

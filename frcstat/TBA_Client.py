@@ -8,7 +8,9 @@ from collections import defaultdict
 import datetime
 
 from .API_Keys import API_Keys
-
+from .Event import Event
+from .Season import Season
+from .Team import Team
 
 class TBA_Client:
     def __init__(self , tbakey = None):
@@ -111,7 +113,55 @@ class TBA_Client:
             fp.write(json.dumps(data))
             success = True
         return success
-    
+        
+    def makeSmartRequest(self , dataName : str , request : str , validityData : dict , requestingObject : type , cacheRefreshAggression : int , dataMutator = None):
+        '''
+            dataName - name of the request. Saves data in the name of this prefix
+            request - request to make to tba
+            validityData - dict that will be updated with the new refresh tag
+            requestingObject - object that is making the request
+            cacheRefreshAggression - 0 only saved , 1 check file , 2 check request
+            dataMutator - mutates the return data for use, optional
+        '''
+        out = None
+        if cacheRefreshAggression == 0 or cacheRefreshAggression == 1:
+            #Read from file
+            if type(requestingObject) == Event:
+                out = self.readEventData(dataName)
+            elif type(requestingObject) == Team:
+                out = self.readTeamData(dataName)
+            elif type(requestingObject) == Season:
+                out = self.readSeasonData(dataName)
+            #If 0, return
+            if cacheRefreshAggression == 0:
+                return out
+            if out != None:
+                return out
+        
+        request = self.makeRequest(request , validityData[dataName])
+        rawData = None
+        if request == None: #Use saved values
+            if type(requestingObject) == Event:
+                out = self.readEventData(dataName)
+            elif type(requestingObject) == Team:
+                out = self.readTeamData(dataName)
+            elif type(requestingObject) == Season:
+                out = self.readSeasonData(dataName)
+        else: #use values from server
+            if dataMutator == None:
+                out = request[0]
+            else:
+                out = dataMutator(request[0])
+            validityData[dataName] = request[1] #Write the If-Modified-Since header to validation file
+            
+            if type(requestingObject) == Event:
+                self.writeEventData(dataName , out)
+            elif type(requestingObject) == Team:
+                self.writeTeamData(dataName , out)
+            elif type(requestingObject) == Season:
+                self.writeSeasonData(dataName , out)
+        return out
+            
     def makeRequest(self , requestTag : str , refreshCode : str = None):
         '''
             requestTag - request string that will be sent to the API
@@ -133,9 +183,9 @@ class TBA_Client:
         if req.status_code == 304:
             return None
         if req.status_code == 401:
-            raise("API Key Not Valid!")
+            raise(Exception("API Key Not Valid!"))
         else:
-            raise("Not valid status code!")
+            raise(Exception("Not valid status code! With Request {}".format(requestTag)))
 
     def URLToJson(self , url: str) -> 'json':
         return(json.loads(requests.get(url).text))
