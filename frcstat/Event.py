@@ -1,5 +1,7 @@
 import re
 import numpy as np
+import scipy.linalg as lin
+from collections import defaultdict
 
 _Singleton_TBA_Client = None
 
@@ -10,6 +12,11 @@ class Event:
                 self.matchData
                 self.teamList
                 self.eventData
+                
+            Derived Data 
+                self.lookup - dict where team key "frc330" maps to index used in other calculations
+                self.oprs - array of oprs, where self.lookup gives us the index of a team to look at
+                self.coprs - dict of arrays, where the key in the dict tells us what component opr we are looking at 
         '''
         self.eventCode = code
         
@@ -60,6 +67,141 @@ class Event:
         fmatch = self.flattenDictionary(match)
         return fmatch.keys()
         
+    def getArrayOPRS(self):
+        '''
+            Fast solving for component OPRS using cholesky decomposition
+            Minimal looping, hard coded incrementation 
+            
+            Returns array where teams are looked up by index
+        '''
+        lookupDict = self._getLookupDict()
+        totalMatches = self.getQualMatchAmount()
+        A = np.zeros((len(self.getTeamList()) , len(self.getTeamList())))
+        B = np.zeros(len(self.getTeamList()))
+        
+        
+        for m in self.matchData:
+            if self.matchData[m]["comp_level"] == "qm":
+                match = self.matchData[m]
+                RS = match["alliances"]["red"]["score"]
+                BS = match["alliances"]["blue"]["score"]
+                if RS != -1 and BS != -1: #is valid match
+                    R1I = lookupDict[match["alliances"]["red"]["team_keys"][0]]
+                    R2I = lookupDict[match["alliances"]["red"]["team_keys"][1]]
+                    R3I = lookupDict[match["alliances"]["red"]["team_keys"][2]]
+                    B1I = lookupDict[match["alliances"]["blue"]["team_keys"][0]]
+                    B2I = lookupDict[match["alliances"]["blue"]["team_keys"][1]]
+                    B3I = lookupDict[match["alliances"]["blue"]["team_keys"][2]]
+                   
+                    A[R1I][R1I] += 1
+                    A[R1I][R2I] += 1
+                    A[R1I][R3I] += 1
+                    A[R2I][R1I] += 1
+                    A[R2I][R2I] += 1
+                    A[R2I][R3I] += 1
+                    A[R3I][R1I] += 1
+                    A[R3I][R2I] += 1
+                    A[R3I][R3I] += 1
+                    
+                    A[B1I][B1I] += 1
+                    A[B1I][B2I] += 1
+                    A[B1I][B3I] += 1
+                    A[B2I][B1I] += 1
+                    A[B2I][B2I] += 1
+                    A[B2I][B3I] += 1
+                    A[B3I][B1I] += 1
+                    A[B3I][B2I] += 1
+                    A[B3I][B3I] += 1
+
+                    B[R1I] += RS
+                    B[R2I] += RS
+                    B[R3I] += RS
+                    
+                    B[B1I] += BS
+                    B[B2I] += BS
+                    B[B3I] += BS
+        return lin.cho_solve(lin.cho_factor(A , True , True , False) , B , False)
+        
+    def getDictOPRS(self):
+        lookupDict = self._getLookupDict()
+        oprs = self.getArrayOPRS()
+        out = {}
+        for key in lookupDict:
+            out[key] = oprs[lookupDict[key]]
+            
+        return out
+        
+    def _assocArrayToDict(self , arr):
+        lookupDict = self._getLookupDict()
+        out = {}
+        for key in lookupDict:
+            out[key] = arr[lookupDict[key]]
+            
+        return out
+         
+    def getComponentOPRS(self):
+        lookupDict = self._getLookupDict()
+        totalMatches = self.getQualMatchAmount()
+        A = np.zeros((len(self.getTeamList()) , len(self.getTeamList())))
+        BDict = defaultdict(lambda : np.zeros(len(self.getTeamList())))
+        
+        validKeys = []
+        colors = ["red" , "blue"]
+        
+        for m in self.matchData:
+            if self.matchData[m]["comp_level"] == "qm":
+                match = self.matchData[m]
+                RS = match["alliances"]["red"]["score"]
+                BS = match["alliances"]["blue"]["score"]
+                if RS != -1 and BS != -1: #is valid match
+                    R1I = lookupDict[match["alliances"]["red"]["team_keys"][0]]
+                    R2I = lookupDict[match["alliances"]["red"]["team_keys"][1]]
+                    R3I = lookupDict[match["alliances"]["red"]["team_keys"][2]]
+                    B1I = lookupDict[match["alliances"]["blue"]["team_keys"][0]]
+                    B2I = lookupDict[match["alliances"]["blue"]["team_keys"][1]]
+                    B3I = lookupDict[match["alliances"]["blue"]["team_keys"][2]]
+                    
+                    #Check what keys have associated numeric values
+                    if len(validKeys) == 0:
+                        for key in match["score_breakdown"]["red"]:
+                            try:
+                                value = float(match["score_breakdown"]["red"][key])
+                                validKeys.append(key)
+                            except ValueError:
+                                pass
+                                
+                    for key in validKeys:
+                        colorIs = [[R1I , R2I , R3I] , [B1I , B2I , B3I]]
+                        for c in range(2): 
+                            for i in colorIs[c]:
+                                BDict[key][i] += match["score_breakdown"][colors[c]][key]
+                   
+                    A[R1I][R1I] += 1
+                    A[R1I][R2I] += 1
+                    A[R1I][R3I] += 1
+                    A[R2I][R1I] += 1
+                    A[R2I][R2I] += 1
+                    A[R2I][R3I] += 1
+                    A[R3I][R1I] += 1
+                    A[R3I][R2I] += 1
+                    A[R3I][R3I] += 1
+                    
+                    A[B1I][B1I] += 1
+                    A[B1I][B2I] += 1
+                    A[B1I][B3I] += 1
+                    A[B2I][B1I] += 1
+                    A[B2I][B2I] += 1
+                    A[B2I][B3I] += 1
+                    A[B3I][B1I] += 1
+                    A[B3I][B2I] += 1
+                    A[B3I][B3I] += 1
+
+        out = {}
+        factoredA = lin.cho_factor(A , True , True , False)
+        for key in validKeys:
+            out[key] = lin.cho_solve(np.copy(factoredA) , BDict[key] , False)
+        return out
+        
     def getQualMatchAmount(self):
         return self.qualMatchAmount
         
@@ -103,7 +245,6 @@ class Event:
         if totalMatches > toMatch:
             totalMatches = toMatch
         A = np.zeros((len(splitPattern) * totalMatches , suffixAmount * len(self.getTeamList())))
-        #x = np.zeros((len(suffixList) * len(self.getTeamList)))
         B = np.zeros((len(splitPattern) * totalMatches))
         
         matchNum = 0
@@ -220,6 +361,7 @@ class Event:
         self.teamList = _Singleton_TBA_Client.makeSmartRequest(teamListObjName , teamListRequest , validityData , self , cacheRefreshAggression)
         
         _Singleton_TBA_Client.writeEventData(self.validityFile , validityData)
+        
         ###Derived Calculations###
         self.teamAmount = len(self.teamList)
         self.lookup = self._getLookupDict()
@@ -228,6 +370,8 @@ class Event:
             m = self.matchData[mkey]
             if m["comp_level"] == "qm":
                 self.qualMatchAmount += 1
+        self.oprs = self.getArrayOPRS()
+        self.coprs = self.getComponentOPRS()
             
       
     def getTeamList(self):

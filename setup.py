@@ -7,6 +7,7 @@ AUTHOR = "Saikiran Ramanan"
 EMAIL = "saikiranra@gmail.com"
 DESCRIPTION = "FRC Statistics Library using TBA to pull data"
 PACKAGES = ["frcstat" , "tests"]
+REQUIRES = ["numpy" , "scipy" , "requests"]
 
 
 
@@ -16,5 +17,6 @@ setup(name=NAME,
     author=AUTHOR,
     author_email=EMAIL,
     description=DESCRIPTION, 
-    packages=PACKAGES
+    packages=PACKAGES,
+    install_requires=REQUIRES
 )
