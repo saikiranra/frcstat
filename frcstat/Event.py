@@ -1,6 +1,8 @@
 import re
+import frcstat.Team as Team
 import numpy as np
 import scipy.linalg as lin
+from scipy.special import erfinv
 from collections import defaultdict
 
 _Singleton_TBA_Client = None
@@ -132,10 +134,7 @@ class Event:
         try:
             return lin.solve(A , B)
         except:
-            print("LEAST SQUARES SOLUTION USED.")
-            #print(A)
-            #print(B)
-            #print(lin.lstsq(A , B))
+            #print("LEAST SQUARES SOLUTION USED.")
             return lin.lstsq(A , B)[0]
         
     def getDictOPRS(self):
@@ -213,13 +212,171 @@ class Event:
                     A[B3I][B3I] += 1
 
         out = {}
-        factoredA = lin.cho_factor(A , True , True , False)
+        
+        #factoredA = lin.cho_factor(A , True , True , False)
         for key in validKeys:
-            out[key] = lin.cho_solve(np.copy(factoredA) , BDict[key] , False)
+            try:
+                out[key] =  lin.solve(np.copy(A) , BDict[key])
+            except:
+                print("LEAST SQUARES SOLUTION USED.")
+                #print(A)
+                #print(B)
+                #print(lin.lstsq(A , B))
+                out[key] =  lin.lstsq(np.copy(A) , BDict[key])[0]
+            #out[key] = lin.cho_solve(np.copy(factoredA) , BDict[key] , False)
         return out
         
     def getQualMatchAmount(self):
         return self.qualMatchAmount
+        
+        
+    def _allianceLookup(self, teams , lookup):
+        for i in range(len(lookup)):
+            for team in teams:
+                if team in lookup[i]:
+                    return i
+        raise Exception("Event _allianceLookup failed")
+        
+    def _getAlliancesFromMatches(self):
+        """
+            Most years
+                Code - R v B
+                qf1  - 1 v 8
+                qf2  - 4 v 5
+                qf3  - 2 v 7
+                qf4  - 3 v 6
+        """
+        alliances = [{"status" : {"level" : "qf" , "status" : "eliminated"} , "picks" : None} for i in range(8)]
+        if self.eventData["year"] == 2015:
+            pass
+        else:
+            alliances[0]["picks"] = self.matchData["qf1m1"]["alliances"]["red"]["team_keys"]
+            alliances[7]["picks"] = self.matchData["qf1m1"]["alliances"]["blue"]["team_keys"]
+            alliances[3]["picks"] = self.matchData["qf2m1"]["alliances"]["red"]["team_keys"]
+            alliances[4]["picks"] = self.matchData["qf2m1"]["alliances"]["blue"]["team_keys"]
+            alliances[1]["picks"] = self.matchData["qf3m1"]["alliances"]["red"]["team_keys"]
+            alliances[6]["picks"] = self.matchData["qf3m1"]["alliances"]["blue"]["team_keys"]
+            alliances[2]["picks"] = self.matchData["qf4m1"]["alliances"]["red"]["team_keys"]
+            alliances[5]["picks"] = self.matchData["qf4m1"]["alliances"]["blue"]["team_keys"]
+            
+            lookup = []
+            for i in range(len(alliances)):
+                lookup.append(alliances[i]["picks"])
+            
+            #finals
+            for codes in [("f" , "f1") , ("sf" , "sf1") , ("sf" , "sf2")]:
+                fdat = self.matchData[codes[1] + "m2"] if codes[1] + "m3" not in self.matchData else self.matchData[codes[1] + "m3"]
+                wCol = fdat["winning_alliance"]
+                lCol = "red" if fdat["winning_alliance"] == "blue" else "blue"
+                wAlliance = self._allianceLookup(fdat["alliances"][wCol]["team_keys"] , lookup)
+                lAlliance = self._allianceLookup(fdat["alliances"][lCol]["team_keys"] , lookup)
+                
+                if alliances[wAlliance]["status"]["level"] == "qf":
+                    alliances[wAlliance]["status"]["status"] = "won"
+                    alliances[wAlliance]["status"]["level"] = codes[0]
+                if alliances[lAlliance]["status"]["level"] == "qf":
+                    alliances[lAlliance]["status"]["status"] = "eliminated"
+                    alliances[lAlliance]["status"]["level"] = codes[0]
+                    
+        return alliances
+
+    def getDistrictPoints(self , teamNumber , rookieYear = None):
+        code = teamNumber
+        if type(teamNumber) == int:
+            code = "frc"+str(teamNumber)
+        if self.districtPoints != None:
+            return self.districtPoints["points"][code]
+        if self.eventData["year"] == 2015:
+            raise Exception("Event getDistrictPoints calculator doesn't currently support 2015")
+        else:
+            #formula
+            rookiePoints = 0
+            awardsPoints = 0
+            playoffPoints = 0
+            alliancePoints = 0
+            rankingPoints = 0
+            
+            #rookie points
+            """
+            if rookieYear == None:
+                team = Team.Team(teamNumber)
+                rookieYear = team.teamData["rookie_year"]
+            yearDiff = self.eventData["year"] - rookieYear
+            if yearDiff < 2:
+                rookiePoints = 10 - (5 * yearDiff)
+            """
+
+            #awards points
+            for award in self.awards:
+                isRecipient = False
+                for recipient in award["recipient_list"]:
+                    if recipient["team_key"] == code:
+                        isRecipient = True
+                        break
+                if isRecipient:
+                    if award["award_type"] == 0: #chairmans
+                        awardsPoints += 10
+                    elif award["award_type"] == 9: #ei
+                        awardsPoints += 8
+                    elif award["award_type"] == 10: #rookie all star
+                        awardsPoints += 8
+                    elif award["award_type"] == 68:  #wildcard
+                        pass
+                    elif award["award_type"] == 14:  #highest rookie seed
+                        pass
+                    elif award["award_type"] > 10:
+                        awardsPoints += 5
+                        
+            #alliance selection results
+            allianceObj = self.alliances #to facilitate the generation of them
+            if not self.alliances:
+                allianceObj = self._getAlliancesFromMatches()
+            for allianceNumber in range(len(allianceObj)):
+                alliance = allianceObj[allianceNumber]
+                if code in alliance["picks"]:
+                    if code == alliance["picks"][0]:
+                        alliancePoints = 16 - allianceNumber
+                    elif code == alliance["picks"][1]:
+                        alliancePoints = 16 - allianceNumber
+                    else:
+                        alliancePoints = 1 + allianceNumber
+                    break
+                    
+            #playoff performance     
+            for matchKeys in self.matchData:
+                if "qm" not in matchKeys:
+                    winningAllianceKey = self.matchData[matchKeys]["winning_alliance"]
+                    if winningAllianceKey == "":
+                        winningAllianceKey = "red"
+                        if self.matchData[matchKeys]["alliances"]["red"]["score"] < self.matchData[matchKeys]["alliances"]["blue"]["score"]:
+                            winningAllianceKey = "blue"
+                    if code in self.matchData[matchKeys]["alliances"][winningAllianceKey]["team_keys"]:
+                        lastMatchInSeries = matchKeys[:-1]+"2" if matchKeys[:-1]+"3" not in self.matchData else matchKeys[:-1]+"3"
+                        if winningAllianceKey == self.matchData[lastMatchInSeries]["winning_alliance"]:
+                            playoffPoints += 5
+
+
+            #qualification round performance
+            r = -1
+            n = self.teamAmount
+            a = 1.07
+            for rankData in self.rankings["rankings"]:
+                if code == rankData["team_key"]:
+                    r = rankData["rank"]
+
+            rankingPoints = np.ceil((erfinv((n - (2 * r) + 2) / (a * n)) * (10 / (erfinv(1/a)))) + 12)
+
+            
+            out = {}
+            out["alliance_points"] = int(alliancePoints)
+            out["award_points"] = int(awardsPoints)
+            out["elim_points"] = int(playoffPoints)
+            out["qual_points"] = int(rankingPoints)
+            out["total"] = rookiePoints + alliancePoints + awardsPoints + playoffPoints + rankingPoints
+
+            return out
+ 
+
         
     def scoreMetricFromPattern(self , pattern = "B11 + B21 + B31 = BS;R11 + R21 + R31 = RS" , toMatch = 9999):
         """
@@ -375,7 +532,26 @@ class Event:
         teamListObjName = "{}-teamlist".format(self.eventCode)
         teamListRequest = "event/{}/teams/keys".format(self.eventCode)
         self.teamList = _Singleton_TBA_Client.makeSmartRequest(teamListObjName , teamListRequest , validityData , self , cacheRefreshAggression)
+
+        #Containts both tie breaker and point data
+        districtPointsObjName = "{}-districtpoints".format(self.eventCode)
+        districtPointsRequest = "event/{}/district_points".format(self.eventCode)
+        self.districtPoints = _Singleton_TBA_Client.makeSmartRequest(districtPointsObjName , districtPointsRequest , validityData , self , cacheRefreshAggression)
+
+        awardsObjName = "{}-awards".format(self.eventCode)
+        awardsRequest = "event/{}/awards".format(self.eventCode)
+        self.awards = _Singleton_TBA_Client.makeSmartRequest(awardsObjName , awardsRequest , validityData , self , cacheRefreshAggression)
         
+        allianceObjName = "{}-alliances".format(self.eventCode)
+        allianceRequest = "event/{}/alliances".format(self.eventCode)
+        self.alliances = _Singleton_TBA_Client.makeSmartRequest(allianceObjName , allianceRequest , validityData , self , cacheRefreshAggression)
+
+
+        rankingsObjName = "{}-rankings".format(self.eventCode)
+        rankingsRequest = "event/{}/rankings".format(self.eventCode)
+        self.rankings = _Singleton_TBA_Client.makeSmartRequest(rankingsObjName , rankingsRequest , validityData , self , cacheRefreshAggression)
+
+
         _Singleton_TBA_Client.writeEventData(self.validityFile , validityData)
         
         ###Derived Calculations###
