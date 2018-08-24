@@ -32,6 +32,28 @@ class Team:
                 out.append(event)
         out.sort(key = lambda x: time.strptime(x["start_date"] , "%Y-%m-%d"))
         return out
+        
+    def getElimEventWinsByYear(self , year):
+        import frcstat.Event as Event
+        if not hasattr(self , "getElimEventWins"):
+            self.getElimEventWins = {}
+        if year in self.getElimEventWins:
+            return self.getElimEventWins[year]
+        self.getElimEventWins[year] = {}
+        for event in self.eventData:
+            if year == event["year"]:
+                ev = Event(event["key"])
+                teamMatches = ev.getTeamMatches(self.teamCode)
+                wins = 0
+                for matchKey in teamMatches.keys():
+                    if teamMatches[matchKey]["comp_level"] != "qm":
+                        color = "blue"
+                        if self.teamCode in teamMatches[matchKey]["alliances"]["red"]["team_keys"]:
+                            color = "red"
+                        if color == teamMatches[matchKey]["winning_alliance"]:
+                            wins += 1
+                self.getElimEventWins[year][event["key"]] = wins
+        return self.getElimEventWins[year]
 
         
     def loadData(self , cacheRefreshAggression):

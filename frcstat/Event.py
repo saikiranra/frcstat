@@ -218,7 +218,7 @@ class Event:
             try:
                 out[key] =  lin.solve(np.copy(A) , BDict[key])
             except:
-                print("LEAST SQUARES SOLUTION USED.")
+                #print("LEAST SQUARES SOLUTION USED.")
                 #print(A)
                 #print(B)
                 #print(lin.lstsq(A , B))
@@ -229,6 +229,16 @@ class Event:
     def getQualMatchAmount(self):
         return self.qualMatchAmount
         
+    def getTeamMatches(self , team):
+        if type(team) == int:
+            team = "frc" + str(team)
+        out = {}
+        for key in self.matchData.keys():
+            if team in self.matchData[key]["alliances"]["red"]["team_keys"]:
+                out[key] = self.matchData[key]
+            elif team in self.matchData[key]["alliances"]["blue"]["team_keys"]:
+                out[key] = self.matchData[key]
+        return out
         
     def _allianceLookup(self, teams , lookup):
         for i in range(len(lookup)):
