@@ -588,6 +588,9 @@ class Event:
       
     def getTeamList(self):
         return self.teamList
+    
+    def getPlayingTeamList(self):
+        return [int(team['team_key'][3:]) for team in self.rankings['rankings']]
         
 class _Pattern_Variable:
     def __init__(self , name , arrayIndex):
