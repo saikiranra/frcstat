@@ -290,14 +290,15 @@ class Event:
                     
         return alliances
 
-    def getDistrictPoints(self , teamNumber , rookieYear = None):
+    def getDistrictPoints(self , teamNumber , rookieYear = None, includePlayoffs = True):
         code = teamNumber
         if type(teamNumber) == int:
             code = "frc"+str(teamNumber)
         if self.districtPoints != None:
             return self.districtPoints["points"][code]
         if self.eventData["year"] == 2015:
-            raise Exception("Event getDistrictPoints calculator doesn't currently support 2015")
+            print("WARNING: undefined behavior for 2015 elims points")
+            #raise Exception("Event getDistrictPoints calculator doesn't currently support 2015")
         else:
             #formula
             rookiePoints = 0
@@ -352,18 +353,19 @@ class Event:
                         alliancePoints = 1 + allianceNumber
                     break
                     
-            #playoff performance     
-            for matchKeys in self.matchData:
-                if "qm" not in matchKeys:
-                    winningAllianceKey = self.matchData[matchKeys]["winning_alliance"]
-                    if winningAllianceKey == "":
-                        winningAllianceKey = "red"
-                        if self.matchData[matchKeys]["alliances"]["red"]["score"] < self.matchData[matchKeys]["alliances"]["blue"]["score"]:
-                            winningAllianceKey = "blue"
-                    if code in self.matchData[matchKeys]["alliances"][winningAllianceKey]["team_keys"]:
-                        lastMatchInSeries = matchKeys[:-1]+"2" if matchKeys[:-1]+"3" not in self.matchData else matchKeys[:-1]+"3"
-                        if winningAllianceKey == self.matchData[lastMatchInSeries]["winning_alliance"]:
-                            playoffPoints += 5
+            #playoff performance
+            if includePlayoffs:
+                for matchKeys in self.matchData:
+                    if "qm" not in matchKeys:
+                        winningAllianceKey = self.matchData[matchKeys]["winning_alliance"]
+                        if winningAllianceKey == "":
+                            winningAllianceKey = "red"
+                            if self.matchData[matchKeys]["alliances"]["red"]["score"] < self.matchData[matchKeys]["alliances"]["blue"]["score"]:
+                                winningAllianceKey = "blue"
+                        if code in self.matchData[matchKeys]["alliances"][winningAllianceKey]["team_keys"]:
+                            lastMatchInSeries = matchKeys[:-1]+"2" if matchKeys[:-1]+"3" not in self.matchData else matchKeys[:-1]+"3"
+                            if winningAllianceKey == self.matchData[lastMatchInSeries]["winning_alliance"]:
+                                playoffPoints += 5
 
 
             #qualification round performance
@@ -386,6 +388,33 @@ class Event:
 
             return out
  
+    def getTeamElimWins(self, teamNumber):
+        if not hasattr(self, "teamElimWins"):
+            self.teamElimWins = {}
+        year = self.eventData["year"]
+        argTeamCode = 'frc{}'.format(teamNumber)
+        if argTeamCode in self.teamElimWins:
+            return self.teamElimWins[argTeamCode]
+        for teamCode in self.teamList:
+            teamMatches = self.getTeamMatches(teamCode)
+            wins = 0
+            for matchKey in teamMatches.keys():
+                if teamMatches[matchKey]["comp_level"] != "qm":
+                    if year != 2015:
+                        color = "blue"
+                        if teamCode in teamMatches[matchKey]["alliances"]["red"]["team_keys"]:
+                            color = "red"
+                        if color == teamMatches[matchKey]["winning_alliance"]:
+                            wins += 1
+                    else:
+                        if (teamCode in teamMatches[matchKey]["alliances"]["red"]["team_keys"] \
+                            and teamMatches[matchKey]["alliances"]["red"]["score"] > teamMatches[matchKey]["alliances"]["blue"]["score"]) \
+                            or (teamCode in teamMatches[matchKey]["alliances"]["blue"]["team_keys"] \
+                            and teamMatches[matchKey]["alliances"]["blue"]["score"] > teamMatches[matchKey]["alliances"]["red"]["score"]):
+                            wins += 1
+                            
+            self.teamElimWins[teamCode] = wins if year != 2015 else min(wins, 6)
+        return self.teamElimWins[argTeamCode]
 
         
     def scoreMetricFromPattern(self , pattern = "B11 + B21 + B31 = BS;R11 + R21 + R31 = RS" , toMatch = 9999):
