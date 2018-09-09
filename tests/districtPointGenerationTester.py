@@ -1,7 +1,7 @@
 import frcstat as frc
 
 
-EVENTS_TO_TEST = ["2018cair" , "2018onwin" , "2015cama"]
+EVENTS_TO_TEST = ["2018cair" , "2018onwin" , "2013txho"]
 DEBUG = True
 
 def tester(event_code):
@@ -19,7 +19,7 @@ def tester(event_code):
 
     first = True
     for team in event.getTeamList():
-        realPoints[team] = event.getDistrictPoints(team)
+        realPoints[team] = event.districtPoints["points"][team]
         if first:
             first = False
             keys = set(realPoints[team].keys())

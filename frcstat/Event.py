@@ -294,7 +294,9 @@ class Event:
         code = teamNumber
         if type(teamNumber) == int:
             code = "frc"+str(teamNumber)
-        if self.districtPoints != None and code in self.districtPoints['points']:
+            
+        if (self.districtPoints != None and code in self.districtPoints['points']) and self.eventData["year"] >= 2015: #years from 2015 to now we can trust TBA data
+
             return self.districtPoints["points"][code]
         if self.eventData["year"] == 2015:
             print("WARNING: undefined behavior for 2015 elims points")
@@ -376,7 +378,7 @@ class Event:
                 if code == rankData["team_key"]:
                     r = rankData["rank"]
 
-            rankingPoints = np.ceil((erfinv((n - (2 * r) + 2) / (a * n)) * (10 / (erfinv(1/a)))) + 12)
+            rankingPoints = min(np.ceil((erfinv((n - (2 * r) + 2) / (a * n)) * (10 / (erfinv(1/a)))) + 12) , 22)
 
             
             out = {}
@@ -568,10 +570,15 @@ class Event:
         matchRequest = "event/{}/matches".format(self.eventCode)
         self.matchData = _Singleton_TBA_Client.makeSmartRequest(matchObjName , matchRequest , validityData , self , cacheRefreshAggression , matchDataMutator)
         
+        rankingsObjName = "{}-rankings".format(self.eventCode)
+        rankingsRequest = "event/{}/rankings".format(self.eventCode)
+        self.rankings = _Singleton_TBA_Client.makeSmartRequest(rankingsObjName , rankingsRequest , validityData , self , cacheRefreshAggression)
+        
         teamListObjName = "{}-teamlist".format(self.eventCode)
         teamListRequest = "event/{}/teams/keys".format(self.eventCode)
-        self.teamList = _Singleton_TBA_Client.makeSmartRequest(teamListObjName , teamListRequest , validityData , self , cacheRefreshAggression)
-
+        self.rawTeamList = _Singleton_TBA_Client.makeSmartRequest(teamListObjName , teamListRequest , validityData , self , cacheRefreshAggression)
+        self.teamList = self.getPlayingTeamList(True)
+        
         #Containts both tie breaker and point data
         districtPointsObjName = "{}-districtpoints".format(self.eventCode)
         districtPointsRequest = "event/{}/district_points".format(self.eventCode)
@@ -584,12 +591,6 @@ class Event:
         allianceObjName = "{}-alliances".format(self.eventCode)
         allianceRequest = "event/{}/alliances".format(self.eventCode)
         self.alliances = _Singleton_TBA_Client.makeSmartRequest(allianceObjName , allianceRequest , validityData , self , cacheRefreshAggression)
-
-
-        rankingsObjName = "{}-rankings".format(self.eventCode)
-        rankingsRequest = "event/{}/rankings".format(self.eventCode)
-        self.rankings = _Singleton_TBA_Client.makeSmartRequest(rankingsObjName , rankingsRequest , validityData , self , cacheRefreshAggression)
-
 
         _Singleton_TBA_Client.writeEventData(self.validityFile , validityData)
         
@@ -616,7 +617,53 @@ class Event:
             pass
       
     def getTeamList(self):
+        """
+           Returns team list. 
+           
+           Currently, this is the same thing as getPlayingTeamList(). This is calculated on the loading of this object. 
+        """
         return self.teamList
+    
+    def getPlayingTeamList(self , getKey = False):
+        """
+            Returns a team list based on rankings or match data
+            
+            getKey determines if the list is filled with numbers or team keys
+            getKey = False : [3476 , 254, 1114, 118]
+            getKey = True  : ["frc3476" , "frc254" , "frc1114" , "frc118"]
+        """
+        modFunc = int
+        if getKey:
+            modFunc = self.getTeamKey
+            
+        if self.rankings != None:
+            if len(self.rankings['rankings']) > 0:
+                return [modFunc(team['team_key'][3:]) for team in self.rankings['rankings']]
+        if self.matchData != None:
+            out = set()
+            for matchKey in self.matchData:
+                for color in self.matchData[matchKey]["alliances"]:
+                    if self.matchData[matchKey]["alliances"][color]["score"] > -1:
+                        out = out.union(self.matchData[matchKey]["alliances"][color]["team_keys"])
+            return [modFunc(x) for x in out]
+        return [modFunc(x) for x in self.rawTeamList]
+        
+    def getTeamKey(self, team):
+        """
+            Helper function to return a teamkey in the form "frc####"
+        """
+        out = str(team)
+        if len(team) < 4:
+            return "frc" + team
+        if team[:2] == "frc":
+            return team
+        return "frc" + team
+        
+    def getRawTeamList(self):
+        """
+           Returns the teamlist that is returned from the API rather than a team list created from matches and rankings
+        """
+        return self.rawTeamList
         
 class _Pattern_Variable:
     def __init__(self , name , arrayIndex):
