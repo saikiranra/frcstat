@@ -74,6 +74,13 @@ class Season:
                 out.append(event)
         return out
 
+    def getDivisionEvents(self):
+        out = []
+        for event in self.events:
+            if event["event_type"] == 3:
+                out.append(event)
+        return out
+
     def getComponentOPRLabels(self):
         pass
         

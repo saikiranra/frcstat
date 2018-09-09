@@ -294,7 +294,9 @@ class Event:
         code = teamNumber
         if type(teamNumber) == int:
             code = "frc"+str(teamNumber)
-        if self.districtPoints != None and self.eventData["year"] >= 2015: #years from 2015 to now we can trust TBA data
+            
+        if (self.districtPoints != None and code in self.districtPoints['points']) and self.eventData["year"] >= 2015: #years from 2015 to now we can trust TBA data
+
             return self.districtPoints["points"][code]
         if self.eventData["year"] == 2015:
             print("WARNING: undefined behavior for 2015 elims points")
@@ -370,7 +372,7 @@ class Event:
 
             #qualification round performance
             r = -1
-            n = self.teamAmount
+            n = len(self.rankings['rankings'])
             a = 1.07
             for rankData in self.rankings["rankings"]:
                 if code == rankData["team_key"]:
