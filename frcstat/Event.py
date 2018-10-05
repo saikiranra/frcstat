@@ -664,6 +664,23 @@ class Event:
            Returns the teamlist that is returned from the API rather than a team list created from matches and rankings
         """
         return self.rawTeamList
+
+    def getAwards(self):
+        """
+            Returns a dictionary mapping from teamKey to a set of awards won at that event, i.e. for 2018nyut, 
+            awards['frc2791'] = set([1, 16]), for winner and industrial design
+        """
+        awardsDict = {teamKey: set([]) for teamKey in self.getRawTeamList()}
+        if self.awards is None:
+            return {}
+        for award in self.awards:
+            awardType = award["award_type"]
+            for recipient in award["recipient_list"]:
+                teamKey = recipient["team_key"]
+                if teamKey is not None:
+                    awardsDict[teamKey].add(awardType)
+        return awardsDict
+
         
 class _Pattern_Variable:
     def __init__(self , name , arrayIndex):
