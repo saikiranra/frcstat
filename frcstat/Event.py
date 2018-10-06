@@ -677,7 +677,7 @@ class Event:
             awardType = award["award_type"]
             for recipient in award["recipient_list"]:
                 teamKey = recipient["team_key"]
-                if teamKey is not None:
+                if teamKey is not None and teamKey in awardsDict:
                     awardsDict[teamKey].add(awardType)
         return awardsDict
 
