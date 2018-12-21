@@ -9,6 +9,7 @@ class Team:
                 self.teamData
                 self.eventData
                 self.awardData
+                self.districtData
         '''
         if type(number) == str:
             self.number = int(float(number.replace("frc" , "")))
@@ -55,6 +56,35 @@ class Team:
                 self.getElimEventWins[year][event["key"]] = wins
         return self.getElimEventWins[year]
 
+    def getDistrictYears(self):
+        """
+        Returns tuple of start year and end year, unless no districts, which then None
+        """
+        if not self.districtData:
+            return None
+
+        start = None
+        end = None
+        for i in range(len(self.districtData)):
+            if i == 0:
+                start = self.districtData[i]["year"]
+                end = self.districtData[i]["year"]
+
+            else:
+                start = min(start , self.districtData[i]["year"])
+                end = max(end , self.districtData[i]["year"])
+        return (start , end)
+
+    def getDistrictAtYear(self , year):
+        if not self.districtData:
+            return None
+
+        for dm in self.districtData:
+            if dm["year"] == year:
+                return dm
+
+        return None
+
         
     def loadData(self , cacheRefreshAggression):
         """
@@ -74,7 +104,11 @@ class Team:
         
         teamAwardName = "{}-awards".format(self.teamCode) #common name
         teamAwardRequest = "team/{}/awards".format(self.teamCode)
-        self.awardData = _Singleton_TBA_Client.makeSmartRequest(teamAwardName , teamAwardRequest , validityData , self , cacheRefreshAggression)   
+        self.awardData = _Singleton_TBA_Client.makeSmartRequest(teamAwardName , teamAwardRequest , validityData , self , cacheRefreshAggression)
+
+        districtDataName = "{}-districts".format(self.teamCode) #common name
+        districtDataRequest = "team/{}/districts".format(self.teamCode)
+        self.districtData = _Singleton_TBA_Client.makeSmartRequest(districtDataName , districtDataRequest , validityData , self , cacheRefreshAggression)   
             
         _Singleton_TBA_Client.writeTeamData(self.validityFile , validityData) #Write validity object to file   
 

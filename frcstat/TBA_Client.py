@@ -45,16 +45,23 @@ class TBA_Client:
             out[k] = obj[k]
         return out
 
+    def readData(self , fname):
+        out = None
+        if os.path.isfile(fname):
+            with open(fname) as fp:
+                try:
+                    out = json.loads(fp.read())
+                except JSONDecodeError:
+                    if __debug__:
+                        print(fname + " failed JSON decoding.")
+        return out
+    
     def readSeasonData(self , file):
         """
             file - File name in season/ .json will be appended
         """
-        out = None
         fname = self.seasonDir + file + ".json"
-        if os.path.isfile(fname):
-            with open(fname) as fp:
-                out = json.loads(fp.read())
-        return out
+        self.readData(fname)
         
     def writeSeasonData(self , file , data):
         """
@@ -72,12 +79,8 @@ class TBA_Client:
         """
             file - File name in season/ .json will be appended
         """
-        out = None
         fname = self.teamDir + file + ".json"
-        if os.path.isfile(fname):
-            with open(fname) as fp:
-                out = json.loads(fp.read())
-        return out
+        self.readData(fname)
         
     def writeTeamData(self , file , data):
         """
@@ -95,12 +98,8 @@ class TBA_Client:
         """
             file - File name in season/ .json will be appended
         """
-        out = None
         fname = self.eventDir + file + ".json"
-        if os.path.isfile(fname):
-            with open(fname) as fp:
-                out = json.loads(fp.read())
-        return out
+        self.readData(fname)
         
     def writeEventData(self , file , data):
         """
