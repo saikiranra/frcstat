@@ -21,11 +21,116 @@ class Event:
                 self.coprs - dict of arrays, where the key in the dict tells us what component opr we are looking at 
         '''
         self.eventCode = code
-        
+        self.cacheRefreshAggression = localDataOnly
+        self.matchData = None
+        self.teamList = None
+        self.rawTeamList = None
+        self.eventData = None
+        self.rankings = None
+        self.teamList = None
+        self.districtPoints = None
+        self.awards = None
+        self.alliances = None
+        self.oprs = None
+        self.coprs = None
+
+        self.fetchedOprs = False
+        self.fetchedCoprs = False
+        self.fetchedAlliances = False
+        self.fetchedRankings = False
+        self.fetchedMatches = False
+
+        self.lookup = None
+
+        self.qualMatchAmount = None
+
         self.validityFile = code + "-valid"
-        self.loadData(localDataOnly)
-        
-        
+        #self.loadData()
+
+    def getMatchData(self):
+        if not self.fetchedMatches:
+            self.loadMatchData()
+            self.fetchedMatches = True
+        return self.matchData
+
+    def getRankings(self):
+        if not self.fetchedRankings:
+            self.loadRankingsData()
+            self.fetchedRankings = True
+        return self.rankings
+
+    def getDistrictPoints(self):
+        if not self.districtPoints:
+            self.loadDistrictPoints()
+        return self.districtPoints
+
+    def getAwards(self):
+        if not self.awards:
+            self.loadAwards()
+        return self.awards
+
+    def getAlliances(self):
+        if not self.fetchedAlliances:
+            self.loadAlliances()
+            self.fetchedAlliances = True
+        return self.alliances
+
+    def getTeamList(self):
+        """
+           Returns team list.
+
+           Currently, this is the same thing as getPlayingTeamList(). This is calculated on the loading of this object.
+        """
+        if not self.teamList:
+            self.loadTeamList()
+        return self.teamList
+
+    def getRawTeamList(self):
+        """
+           Returns the teamlist that is returned from the API rather than a team list created from matches and rankings
+        """
+        if not self.rawTeamList:
+            self.loadTeamList()
+        return self.rawTeamList
+
+    def getEventData(self):
+        if not self.eventData:
+            self.loadEventData()
+        return self.eventData
+
+    def getLookup(self):
+        if not self.lookup:
+            self.lookup = self._getLookupDict()
+        return self.lookup
+
+    def getOprs(self):
+        if not self.fetchedOprs:
+            self.loadOprs()
+            self.fetchedOprs = True
+        return self.oprs
+
+    def getCoprs(self):
+        if not self.fetchedCoprs:
+            self.loadCoprs()
+            self.fetchedCoprs = True
+        return self.coprs
+
+    def getTeamAmount(self):
+        return len(self.getTeamList())
+
+    def getQualMatchAmount(self):
+        if not self.qualMatchAmount:
+            self.qualMatchAmount = 0
+            matchData = self.getMatchData()
+            for mkey in matchData:
+                m = matchData[mkey]
+                if m["comp_level"] == "qm":
+                    self.qualMatchAmount += 1
+        return self.qualMatchAmount
+
+    def getYear(self):
+        eventData = self.getEventData()
+        return eventData['year']
     def getCalculationPatterns(self):
         patterns = {}
         patterns["OPR"] = "B11 + B21 + B31 = BS;R11 + R21 + R31 = RS"
@@ -42,16 +147,20 @@ class Event:
                 f1m1
                 qf2m3
         """
-        return self.matchData[matchKey]
+        matchData = self.getMatchData()
+        return matchData[matchKey]
         
     def elimMatchGen(self):
-        for m in self.matchData:
-            if self.matchData[m]["comp_level"] != "qm":
-                yield self.matchData[m]
+        matchData = self.getMatchData()
+        for m in matchData:
+            if matchData[m]["comp_level"] != "qm":
+                yield matchData[m]
+
     def qualsMatchGen(self):
-        for m in self.matchData:
-            if self.matchData[m]["comp_level"] == "qm":
-                yield self.matchData[m]
+        matchData = self.getMatchData()
+        for m in matchData:
+            if matchData[m]["comp_level"] == "qm":
+                yield matchData[m]
         
     def flattenDictionary(self , inDict):
         """
@@ -89,10 +198,10 @@ class Event:
         A = np.zeros((len(self.getTeamList()) , len(self.getTeamList())))
         B = np.zeros(len(self.getTeamList()))
         
-        
-        for m in self.matchData:
-            if self.matchData[m]["comp_level"] == "qm":
-                match = self.matchData[m]
+        matchData = self.getMatchData()
+        for m in matchData:
+            if matchData[m]["comp_level"] == "qm":
+                match = matchData[m]
                 RS = match["alliances"]["red"]["score"]
                 BS = match["alliances"]["blue"]["score"]
                 if RS != -1 and BS != -1: #is valid match
@@ -162,10 +271,10 @@ class Event:
         
         validKeys = []
         colors = ["red" , "blue"]
-        
-        for m in self.matchData:
-            if self.matchData[m]["comp_level"] == "qm":
-                match = self.matchData[m]
+        matchData = self.getMatchData()
+        for m in matchData:
+            if matchData[m]["comp_level"] == "qm":
+                match = matchData[m]
                 RS = match["alliances"]["red"]["score"]
                 BS = match["alliances"]["blue"]["score"]
                 if RS != -1 and BS != -1: #is valid match
@@ -216,7 +325,7 @@ class Event:
         #factoredA = lin.cho_factor(A , True , True , False)
         for key in validKeys:
             try:
-                out[key] =  lin.solve(np.copy(A) , BDict[key])
+                out[key] = lin.solve(np.copy(A), BDict[key])
             except:
                 #print("LEAST SQUARES SOLUTION USED.")
                 #print(A)
@@ -226,18 +335,16 @@ class Event:
             #out[key] = lin.cho_solve(np.copy(factoredA) , BDict[key] , False)
         return out
         
-    def getQualMatchAmount(self):
-        return self.qualMatchAmount
-        
     def getTeamMatches(self , team):
         if type(team) == int:
             team = "frc" + str(team)
         out = {}
-        for key in self.matchData.keys():
-            if team in self.matchData[key]["alliances"]["red"]["team_keys"]:
-                out[key] = self.matchData[key]
-            elif team in self.matchData[key]["alliances"]["blue"]["team_keys"]:
-                out[key] = self.matchData[key]
+        matchData = self.getMatchData()
+        for key in matchData.keys():
+            if team in matchData[key]["alliances"]["red"]["team_keys"]:
+                out[key] = matchData[key]
+            elif team in matchData[key]["alliances"]["blue"]["team_keys"]:
+                out[key] = matchData[key]
         return out
         
     def _allianceLookup(self, teams , lookup):
@@ -257,17 +364,18 @@ class Event:
                 qf4  - 3 v 6
         """
         alliances = [{"status" : {"level" : "qf" , "status" : "eliminated"} , "picks" : None} for i in range(8)]
-        if self.eventData["year"] == 2015:
+        if self.getYear() == 2015:
             pass
         else:
-            alliances[0]["picks"] = self.matchData["qf1m1"]["alliances"]["red"]["team_keys"]
-            alliances[7]["picks"] = self.matchData["qf1m1"]["alliances"]["blue"]["team_keys"]
-            alliances[3]["picks"] = self.matchData["qf2m1"]["alliances"]["red"]["team_keys"]
-            alliances[4]["picks"] = self.matchData["qf2m1"]["alliances"]["blue"]["team_keys"]
-            alliances[1]["picks"] = self.matchData["qf3m1"]["alliances"]["red"]["team_keys"]
-            alliances[6]["picks"] = self.matchData["qf3m1"]["alliances"]["blue"]["team_keys"]
-            alliances[2]["picks"] = self.matchData["qf4m1"]["alliances"]["red"]["team_keys"]
-            alliances[5]["picks"] = self.matchData["qf4m1"]["alliances"]["blue"]["team_keys"]
+            matchData = self.getMatchData()
+            alliances[0]["picks"] = matchData["qf1m1"]["alliances"]["red"]["team_keys"]
+            alliances[7]["picks"] = matchData["qf1m1"]["alliances"]["blue"]["team_keys"]
+            alliances[3]["picks"] = matchData["qf2m1"]["alliances"]["red"]["team_keys"]
+            alliances[4]["picks"] = matchData["qf2m1"]["alliances"]["blue"]["team_keys"]
+            alliances[1]["picks"] = matchData["qf3m1"]["alliances"]["red"]["team_keys"]
+            alliances[6]["picks"] = matchData["qf3m1"]["alliances"]["blue"]["team_keys"]
+            alliances[2]["picks"] = matchData["qf4m1"]["alliances"]["red"]["team_keys"]
+            alliances[5]["picks"] = matchData["qf4m1"]["alliances"]["blue"]["team_keys"]
             
             lookup = []
             for i in range(len(alliances)):
@@ -275,7 +383,7 @@ class Event:
             
             #finals
             for codes in [("f" , "f1") , ("sf" , "sf1") , ("sf" , "sf2")]:
-                fdat = self.matchData[codes[1] + "m2"] if codes[1] + "m3" not in self.matchData else self.matchData[codes[1] + "m3"]
+                fdat = matchData[codes[1] + "m2"] if codes[1] + "m3" not in matchData else matchData[codes[1] + "m3"]
                 wCol = fdat["winning_alliance"]
                 lCol = "red" if fdat["winning_alliance"] == "blue" else "blue"
                 wAlliance = self._allianceLookup(fdat["alliances"][wCol]["team_keys"] , lookup)
@@ -294,11 +402,11 @@ class Event:
         code = teamNumber
         if type(teamNumber) == int:
             code = "frc"+str(teamNumber)
-            
-        if (self.districtPoints != None and code in self.districtPoints['points']) and self.eventData["year"] >= 2015: #years from 2015 to now we can trust TBA data
 
-            return self.districtPoints["points"][code]
-        if self.eventData["year"] == 2015:
+        districtPoints = self.getDistrictPoints()
+        if (districtPoints is not None and code in districtPoints['points']) and self.getYear() >= 2015: #years from 2015 to now we can trust TBA data
+            return districtPoints["points"][code]
+        if self.getYear() == 2015:
             print("WARNING: undefined behavior for 2015 elims points")
             #raise Exception("Event getDistrictPoints calculator doesn't currently support 2015")
         else:
@@ -320,7 +428,8 @@ class Event:
             """
 
             #awards points
-            for award in self.awards:
+            awards = self.getAwards()
+            for award in awards:
                 isRecipient = False
                 for recipient in award["recipient_list"]:
                     if recipient["team_key"] == code:
@@ -341,8 +450,8 @@ class Event:
                         awardsPoints += 5
                         
             #alliance selection results
-            allianceObj = self.alliances #to facilitate the generation of them
-            if not self.alliances:
+            allianceObj = self.getAlliances() #to facilitate the generation of them
+            if not allianceObj:
                 allianceObj = self._getAlliancesFromMatches()
             for allianceNumber in range(len(allianceObj)):
                 alliance = allianceObj[allianceNumber]
@@ -357,30 +466,31 @@ class Event:
                     
             #playoff performance
             if includePlayoffs:
-                for matchKeys in self.matchData:
+                matchData = self.getMatchData()
+                for matchKeys in matchData:
                     if "qm" not in matchKeys:
-                        winningAllianceKey = self.matchData[matchKeys]["winning_alliance"]
+                        winningAllianceKey = matchData[matchKeys]["winning_alliance"]
                         if winningAllianceKey == "":
                             winningAllianceKey = "red"
-                            if self.matchData[matchKeys]["alliances"]["red"]["score"] < self.matchData[matchKeys]["alliances"]["blue"]["score"]:
+                            if matchData[matchKeys]["alliances"]["red"]["score"] < matchData[matchKeys]["alliances"]["blue"]["score"]:
                                 winningAllianceKey = "blue"
-                        if code in self.matchData[matchKeys]["alliances"][winningAllianceKey]["team_keys"]:
-                            lastMatchInSeries = matchKeys[:-1]+"2" if matchKeys[:-1]+"3" not in self.matchData else matchKeys[:-1]+"3"
-                            if winningAllianceKey == self.matchData[lastMatchInSeries]["winning_alliance"]:
+                        if code in matchData[matchKeys]["alliances"][winningAllianceKey]["team_keys"]:
+                            lastMatchInSeries = matchKeys[:-1]+"2" if matchKeys[:-1]+"3" not in matchData else matchKeys[:-1]+"3"
+                            if winningAllianceKey == matchData[lastMatchInSeries]["winning_alliance"]:
                                 playoffPoints += 5
 
 
             #qualification round performance
+            rankings = self.getRankings()
             r = -1
-            n = len(self.rankings['rankings'])
+            n = len(rankings['rankings'])
             a = 1.07
-            for rankData in self.rankings["rankings"]:
+            for rankData in rankings["rankings"]:
                 if code == rankData["team_key"]:
                     r = rankData["rank"]
 
             rankingPoints = min(np.ceil((erfinv((n - (2 * r) + 2) / (a * n)) * (10 / (erfinv(1/a)))) + 12) , 22)
 
-            
             out = {}
             out["alliance_points"] = int(alliancePoints)
             out["award_points"] = int(awardsPoints)
@@ -393,7 +503,8 @@ class Event:
     def getTeamElimWins(self, teamNumber):
         if not hasattr(self, "teamElimWins"):
             self.teamElimWins = {}
-        year = self.eventData["year"]
+        eventData = self.getEventData()
+        year = eventData["year"]
         argTeamCode = 'frc{}'.format(teamNumber)
         if argTeamCode in self.teamElimWins:
             return self.teamElimWins[argTeamCode]
@@ -462,7 +573,7 @@ class Event:
         B = np.zeros((len(splitPattern) * totalMatches))
         
         matchNum = 0
-        sortedMatches = [self.matchData[m] for m in self.matchData]
+        sortedMatches = [self.matchData[m] for m in self.getMatchData()]
         sortedMatches.sort(key = lambda x: float(x["match_number"]))
         
         for match in sortedMatches:
@@ -528,10 +639,10 @@ class Event:
             Converts an array of values into a dictionary
             Where every index in the metricArray becomes associated with a team with the same index in teamList
         """
-        if len(metricArray) != self.teamAmount:
+        if len(metricArray) != self.getTeamAmount():
             raise("metricArray not same size as teamList!")
         out = {}
-        for i in range(self.teamAmount):
+        for i in range(self.getTeamAmount()):
             out[self.teamList[i]] = metricArray[i]
         return out
 
@@ -540,12 +651,18 @@ class Event:
             Returns a dictionary where team codes are linked to an array index
         """
         out = {}
-        for i in range(self.teamAmount):
-            out[self.teamList[i]] = i
+        teamList = self.getTeamList()
+        for i in range(self.getTeamAmount()):
+            out[teamList[i]] = i
         return out
-        
-        
-    def loadData(self , cacheRefreshAggression):
+
+    def readValidityData(self):
+        return _Singleton_TBA_Client.dictToDefaultDict(_Singleton_TBA_Client.readEventData(self.validityFile) , lambda:None)
+
+    def writeValidityData(self, validityData):
+        return _Singleton_TBA_Client.writeEventData(self.validityFile , validityData)
+
+    def loadData(self):
         '''
             cacheRefreshAggression - [0,1,2]. 
                 0 only uses saved data
@@ -554,76 +671,102 @@ class Event:
             
             
         '''
-        validityData = _Singleton_TBA_Client.dictToDefaultDict(_Singleton_TBA_Client.readEventData(self.validityFile) , lambda:None)
-        
+
+        self.loadEventData()
+        self.loadMatchData()
+        self.loadRankingsData()
+        self.loadTeamList()
+        self.loadDistrictPoints()
+        self.loadAwards()
+        self.loadAlliances()
+
+        ###Derived Calculations###
+
+        self.loadOprs()
+        self.loadCoprs()
+
+
+    def loadEventData(self):
+        validityData = self.readValidityData()
         dataObjName = "{}-data".format(self.eventCode)
         dataRequest = "event/{}".format(self.eventCode)
-        self.eventData = _Singleton_TBA_Client.makeSmartRequest(dataObjName , dataRequest , validityData , self , cacheRefreshAggression)
-        
+        self.eventData = _Singleton_TBA_Client.makeSmartRequest(dataObjName, dataRequest, validityData, self,
+                                                                self.cacheRefreshAggression)
+        self.writeValidityData(validityData)
+
+    def loadMatchData(self):
+        validityData = self.readValidityData()
         def matchDataMutator(md):
             out = {}
             for m in md:
-                out[m["key"].replace(self.eventCode+"_" ,"")] = m
+                out[m["key"].replace(self.eventCode + "_", "")] = m
             return out
-        
+
         matchObjName = "{}-matches".format(self.eventCode)
         matchRequest = "event/{}/matches".format(self.eventCode)
-        self.matchData = _Singleton_TBA_Client.makeSmartRequest(matchObjName , matchRequest , validityData , self , cacheRefreshAggression , matchDataMutator)
-        
+        self.matchData = _Singleton_TBA_Client.makeSmartRequest(matchObjName, matchRequest, validityData, self,
+                                                                self.cacheRefreshAggression, matchDataMutator)
+        self.writeValidityData(validityData)
+
+    def loadRankingsData(self):
+        validityData = self.readValidityData()
         rankingsObjName = "{}-rankings".format(self.eventCode)
         rankingsRequest = "event/{}/rankings".format(self.eventCode)
-        self.rankings = _Singleton_TBA_Client.makeSmartRequest(rankingsObjName , rankingsRequest , validityData , self , cacheRefreshAggression)
-        
+        self.rankings = _Singleton_TBA_Client.makeSmartRequest(rankingsObjName, rankingsRequest, validityData, self,
+                                                               self.cacheRefreshAggression)
+        self.writeValidityData(validityData)
+
+    def loadTeamList(self):
+        validityData = self.readValidityData()
         teamListObjName = "{}-teamlist".format(self.eventCode)
         teamListRequest = "event/{}/teams/keys".format(self.eventCode)
-        self.rawTeamList = _Singleton_TBA_Client.makeSmartRequest(teamListObjName , teamListRequest , validityData , self , cacheRefreshAggression)
+        self.rawTeamList = _Singleton_TBA_Client.makeSmartRequest(teamListObjName, teamListRequest, validityData, self,
+                                                                  self.cacheRefreshAggression)
         self.teamList = self.getPlayingTeamList(True)
-        
-        #Containts both tie breaker and point data
+        self.writeValidityData(validityData)
+
+    def loadDistrictPoints(self):
+        validityData = self.readValidityData()
+        # Containts both tie breaker and point data
         districtPointsObjName = "{}-districtpoints".format(self.eventCode)
         districtPointsRequest = "event/{}/district_points".format(self.eventCode)
-        self.districtPoints = _Singleton_TBA_Client.makeSmartRequest(districtPointsObjName , districtPointsRequest , validityData , self , cacheRefreshAggression)
+        self.districtPoints = _Singleton_TBA_Client.makeSmartRequest(districtPointsObjName, districtPointsRequest,
+                                                                     validityData, self, self.cacheRefreshAggression)
+        self.writeValidityData(validityData)
 
+    def loadAwards(self):
+        validityData = self.readValidityData()
         awardsObjName = "{}-awards".format(self.eventCode)
         awardsRequest = "event/{}/awards".format(self.eventCode)
-        self.awards = _Singleton_TBA_Client.makeSmartRequest(awardsObjName , awardsRequest , validityData , self , cacheRefreshAggression)
-        
+        self.awards = _Singleton_TBA_Client.makeSmartRequest(awardsObjName, awardsRequest, validityData, self,
+                                                             self.cacheRefreshAggression)
+        self.writeValidityData(validityData)
+
+    def loadAlliances(self):
+        validityData = self.readValidityData()
         allianceObjName = "{}-alliances".format(self.eventCode)
         allianceRequest = "event/{}/alliances".format(self.eventCode)
-        self.alliances = _Singleton_TBA_Client.makeSmartRequest(allianceObjName , allianceRequest , validityData , self , cacheRefreshAggression)
+        self.alliances = _Singleton_TBA_Client.makeSmartRequest(allianceObjName, allianceRequest, validityData, self,
+                                                                self.cacheRefreshAggression)
+        self.writeValidityData(validityData)
 
-        _Singleton_TBA_Client.writeEventData(self.validityFile , validityData)
-        
-        ###Derived Calculations###
-        self.teamAmount = len(self.teamList)
-        self.lookup = self._getLookupDict()
-        self.qualMatchAmount = 0
-        for mkey in self.matchData:
-            m = self.matchData[mkey]
-            if m["comp_level"] == "qm":
-                self.qualMatchAmount += 1
-                
+    def loadOprs(self):
         self.oprs = np.array(_Singleton_TBA_Client.readEventData("{}-oprs".format(self.eventCode)))
         if self.oprs.size <= 1:
             self.oprs = self.getArrayOPRS()
-            _Singleton_TBA_Client.writeEventData("{}-oprs".format(self.eventCode) , self.oprs.tolist())
-        #We can't get COPRS for old games
+            _Singleton_TBA_Client.writeEventData("{}-oprs".format(self.eventCode), self.oprs.tolist())
+
+    def loadCoprs(self):
+        # We can't get COPRS for old games
         try:
             self.coprs = np.array(_Singleton_TBA_Client.readEventData("{}-coprs".format(self.eventCode)))
-            if  self.coprs.size <= 1:
+            if self.coprs.size <= 1:
                 self.coprs = self.getComponentOPRS()
-                _Singleton_TBA_Client.writeEventData("{}-coprs".format(self.eventCode) , self.coprs.tolist())
+                _Singleton_TBA_Client.writeEventData("{}-coprs".format(self.eventCode), self.coprs.tolist())
         except:
             pass
-      
-    def getTeamList(self):
-        """
-           Returns team list. 
-           
-           Currently, this is the same thing as getPlayingTeamList(). This is calculated on the loading of this object. 
-        """
-        return self.teamList
-    
+
+
     def getPlayingTeamList(self , getKey = False):
         """
             Returns a team list based on rankings or match data
@@ -635,16 +778,18 @@ class Event:
         modFunc = int
         if getKey:
             modFunc = self.getTeamKey
-            
-        if self.rankings != None:
-            if len(self.rankings['rankings']) > 0:
-                return [modFunc(team['team_key'][3:]) for team in self.rankings['rankings']]
-        if self.matchData != None:
+
+        rankings = self.getRankings()
+        if rankings:
+            if len(rankings['rankings']) > 0:
+                return [modFunc(team['team_key'][3:]) for team in rankings['rankings']]
+        matchData = self.getMatchData()
+        if matchData:
             out = set()
-            for matchKey in self.matchData:
-                for color in self.matchData[matchKey]["alliances"]:
-                    if self.matchData[matchKey]["alliances"][color]["score"] > -1:
-                        out = out.union(self.matchData[matchKey]["alliances"][color]["team_keys"])
+            for matchKey in matchData:
+                for color in matchData[matchKey]["alliances"]:
+                    if matchData[matchKey]["alliances"][color]["score"] > -1:
+                        out = out.union(matchData[matchKey]["alliances"][color]["team_keys"])
             return [modFunc(x) for x in out]
         return [modFunc(x) for x in self.rawTeamList]
         
@@ -658,12 +803,6 @@ class Event:
         if team[:2] == "frc":
             return team
         return "frc" + team
-        
-    def getRawTeamList(self):
-        """
-           Returns the teamlist that is returned from the API rather than a team list created from matches and rankings
-        """
-        return self.rawTeamList
 
     def getAwards(self):
         """
@@ -671,9 +810,10 @@ class Event:
             awards['frc2791'] = set([1, 16]), for winner and industrial design
         """
         awardsDict = {teamKey: set([]) for teamKey in self.getRawTeamList()}
-        if self.awards is None:
+        awards = self.getAwards()
+        if awards is None:
             return {}
-        for award in self.awards:
+        for award in awards:
             awardType = award["award_type"]
             for recipient in award["recipient_list"]:
                 teamKey = recipient["team_key"]
