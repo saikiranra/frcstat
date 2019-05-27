@@ -18,18 +18,31 @@ class Team:
         self.teamCode = "frc{}".format(str(self.number))
         self.validityFile = str(self.number) + "-valid"
         self.cacheRefreshAggression = cacheRefreshAggression
-        self.loadData()
+        #self.loadData()
+        self.teamData = None
+        self.eventData = None
+        self.awardData = None
+        self.districtData = None
+
 
     def getTeamData(self):
+        if not self.teamData:
+            self.loadTeamData()
         return self.teamData
 
     def getEventData(self):
+        if not self.eventData:
+            self.loadEventData()
         return self.eventData
 
     def getAwardData(self):
+        if not self.awardData:
+            self.loadAwardData()
         return self.awardData
 
     def getDistrictData(self):
+        if not self.districtData:
+            self.loadDistrictData()
         return self.districtData
 
     def getAwardsByYear(self , year):
@@ -100,32 +113,59 @@ class Team:
 
         return None
 
-        
+    def readValidityData(self):
+        return _Singleton_TBA_Client.dictToDefaultDict(_Singleton_TBA_Client.readTeamData(self.validityFile) , lambda:None)
+
+    def writeValidityData(self, validityData):
+        return _Singleton_TBA_Client.writeTeamData(self.validityFile, validityData)  # Write validity object to file
+
     def loadData(self):
         """
             
         """
-        
-        # First get modified data to check if update needed
-        validityData = _Singleton_TBA_Client.dictToDefaultDict(_Singleton_TBA_Client.readTeamData(self.validityFile) , lambda:None)
-        
+
+        self.loadTeamData()
+        self.loadEventData()
+        self.loadAwardData()
+        self.loadDistrictData()
+
+    def loadTeamData(self):
+        validityData = self.readValidityData()
+
         teamDataName = "{}-data".format(self.teamCode)
         teamDataRequest = "team/{}".format(self.teamCode)
-        self.teamData = _Singleton_TBA_Client.makeSmartRequest(teamDataName , teamDataRequest , validityData , self , self.cacheRefreshAggression)
-        
-        teamEventName = "{}-events".format(self.teamCode) #common name
-        teamEventRequest = "team/{}/events".format(self.teamCode)
-        self.eventData = _Singleton_TBA_Client.makeSmartRequest(teamEventName , teamEventRequest , validityData , self , self.cacheRefreshAggression)
-        
-        teamAwardName = "{}-awards".format(self.teamCode) #common name
-        teamAwardRequest = "team/{}/awards".format(self.teamCode)
-        self.awardData = _Singleton_TBA_Client.makeSmartRequest(teamAwardName , teamAwardRequest , validityData , self , self.cacheRefreshAggression)
+        self.teamData = _Singleton_TBA_Client.makeSmartRequest(teamDataName, teamDataRequest, validityData, self,
+                                                               self.cacheRefreshAggression)
 
-        districtDataName = "{}-districts".format(self.teamCode) #common name
+        self.writeValidityData(validityData)
+
+    def loadEventData(self):
+        validityData = self.readValidityData()
+
+        teamEventName = "{}-events".format(self.teamCode)  # common name
+        teamEventRequest = "team/{}/events".format(self.teamCode)
+        self.eventData = _Singleton_TBA_Client.makeSmartRequest(teamEventName, teamEventRequest, validityData, self,
+                                                                self.cacheRefreshAggression)
+
+        self.writeValidityData(validityData)
+
+    def loadAwardData(self):
+        validityData = self.readValidityData()
+        teamAwardName = "{}-awards".format(self.teamCode)  # common name
+        teamAwardRequest = "team/{}/awards".format(self.teamCode)
+        self.awardData = _Singleton_TBA_Client.makeSmartRequest(teamAwardName, teamAwardRequest, validityData, self,
+                                                                self.cacheRefreshAggression)
+        self.writeValidityData(validityData)
+
+
+    def loadDistrictData(self):
+        validityData = self.readValidityData()
+        districtDataName = "{}-districts".format(self.teamCode)  # common name
         districtDataRequest = "team/{}/districts".format(self.teamCode)
-        self.districtData = _Singleton_TBA_Client.makeSmartRequest(districtDataName , districtDataRequest , validityData , self , self.cacheRefreshAggression)
-            
-        _Singleton_TBA_Client.writeTeamData(self.validityFile , validityData) #Write validity object to file   
+        self.districtData = _Singleton_TBA_Client.makeSmartRequest(districtDataName, districtDataRequest, validityData,
+                                                                   self, self.cacheRefreshAggression)
+        self.writeValidityData(validityData)
+
 
 def _Team_Set_TBA_Client(client):
     global _Singleton_TBA_Client
