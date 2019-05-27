@@ -24,6 +24,8 @@ class Event:
         
         self.validityFile = code + "-valid"
         self.loadData(localDataOnly)
+
+        self.teamElimWins = None
         
         
     def getCalculationPatterns(self):
@@ -391,7 +393,7 @@ class Event:
             return out
  
     def getTeamElimWins(self, teamNumber):
-        if not hasattr(self, "teamElimWins"):
+        if not self.teamElimWins:
             self.teamElimWins = {}
         year = self.eventData["year"]
         argTeamCode = 'frc{}'.format(teamNumber)
