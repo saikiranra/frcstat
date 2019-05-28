@@ -1,8 +1,8 @@
 class ObjectShare:
-    _share = {}
 
     def __init__(self, objectInit):
         self.objectInit = objectInit
+        self._share = {}
 
     def get(self, *args, **kwargs):
         key = args, frozenset(kwargs.items())
