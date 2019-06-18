@@ -1,7 +1,7 @@
 from collections import defaultdict
+from .ObjectShare import ObjectShare
 
 _Singleton_TBA_Client = None
-
 
 
 class Season:
@@ -92,7 +92,14 @@ class Season:
         self.events = _Singleton_TBA_Client.makeSmartRequest(eventObjName , eventRequest , validityData , self , cacheRefreshAggression)
             
         _Singleton_TBA_Client.writeSeasonData(self.validityFile , validityData) #Write validity object to file
-        
+
+
+_seasonShare = ObjectShare(Season)
+
+
+def getSeason(year, cacheRefreshAggression = 1):
+    return _seasonShare.get(year, cacheRefreshAggression)
+
 def _Season_Set_TBA_Client(client):
     global _Singleton_TBA_Client
     _Singleton_TBA_Client = client
