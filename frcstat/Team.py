@@ -1,4 +1,5 @@
 import time
+from .ObjectShare import ObjectShare
 
 _Singleton_TBA_Client = None
 
@@ -165,6 +166,14 @@ class Team:
         self.districtData = _Singleton_TBA_Client.makeSmartRequest(districtDataName, districtDataRequest, validityData,
                                                                    self, self.cacheRefreshAggression)
         self.writeValidityData(validityData)
+
+
+
+_teamShare = ObjectShare(Team)
+
+
+def getTeam(teamNumber, cacheRefreshAggression = 1):
+    return _teamShare.get(teamNumber, cacheRefreshAggression)
 
 
 def _Team_Set_TBA_Client(client):

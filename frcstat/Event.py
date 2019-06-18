@@ -4,6 +4,7 @@ import numpy as np
 import scipy.linalg as lin
 from scipy.special import erfinv
 from collections import defaultdict
+from .ObjectShare import ObjectShare
 
 _Singleton_TBA_Client = None
 
@@ -760,7 +761,14 @@ class _Pattern_Variable:
     
     def resetFactor(self):
         self.factor = 0
-    
+
+
+_eventShare = ObjectShare(Event)
+
+
+def getEvent(eventKey, cacheRefreshAggression = 1):
+    return _eventShare.get(eventKey, cacheRefreshAggression)
+
         
 def _Event_Set_TBA_Client(client):
     global _Singleton_TBA_Client
