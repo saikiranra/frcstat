@@ -46,7 +46,6 @@ class Event:
         self.qualMatchAmount = None
 
         self.validityFile = code + "-valid"
-        #self.loadData()
 
     def getMatchData(self):
         if not self.fetchedMatches:
@@ -132,6 +131,7 @@ class Event:
     def getYear(self):
         eventData = self.getEventData()
         return eventData['year']
+
     def getCalculationPatterns(self):
         patterns = {}
         patterns["OPR"] = "B11 + B21 + B31 = BS;R11 + R21 + R31 = RS"
@@ -502,7 +502,7 @@ class Event:
             return out
  
     def getTeamElimWins(self, teamNumber):
-        if not hasattr(self, "teamElimWins"):
+        if not self.teamElimWins:
             self.teamElimWins = {}
         eventData = self.getEventData()
         year = eventData["year"]

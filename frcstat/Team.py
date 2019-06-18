@@ -25,6 +25,8 @@ class Team:
         self.awardData = None
         self.districtData = None
 
+        self.getElimEventWins = None
+
 
     def getTeamData(self):
         if not self.teamData:
@@ -63,7 +65,7 @@ class Team:
         
     def getElimEventWinsByYear(self , year):
         import frcstat.Event as Event
-        if not hasattr(self, "getElimEventWins"):
+        if not self.getElimEventWins:
             self.getElimEventWins = {}
         if year in self.getElimEventWins:
             return self.getElimEventWins[year]
