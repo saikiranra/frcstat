@@ -1,9 +1,10 @@
 import time
+from .ObjectShare import ObjectShare
 
 _Singleton_TBA_Client = None
 
 class Team:
-    def __init__(self , number , cacheRefreshAggression = 1):
+    def __init__(self, number, cacheRefreshAggression = 1):
         '''
             Data Loaded from TBA
                 self.teamData
@@ -12,36 +13,64 @@ class Team:
                 self.districtData
         '''
         if type(number) == str:
-            self.number = int(float(number.replace("frc" , "")))
+            self.number = int(float(number.replace("frc", "")))
         else:
             self.number = number
         self.teamCode = "frc{}".format(str(self.number))
         self.validityFile = str(self.number) + "-valid"
-        self.loadData(cacheRefreshAggression)
-        
+        self.cacheRefreshAggression = cacheRefreshAggression
+        #self.loadData()
+        self.teamData = None
+        self.eventData = None
+        self.awardData = None
+        self.districtData = None
+
+        self.getElimEventWins = None
+
+
+    def getTeamData(self):
+        if not self.teamData:
+            self.loadTeamData()
+        return self.teamData
+
+    def getEventData(self):
+        if not self.eventData:
+            self.loadEventData()
+        return self.eventData
+
+    def getAwardData(self):
+        if not self.awardData:
+            self.loadAwardData()
+        return self.awardData
+
+    def getDistrictData(self):
+        if not self.districtData:
+            self.loadDistrictData()
+        return self.districtData
+
     def getAwardsByYear(self , year):
         out = []
-        for award in self.awardData:
+        for award in self.getAwardData():
             if year == award["year"]:
                 out.append(award)
         return out
         
-    def getEventsByYear(self , year):
+    def getEventsByYear(self, year):
         out = []
-        for event in self.eventData:
+        for event in self.getEventData():
             if year == event["year"]:
                 out.append(event)
-        out.sort(key = lambda x: time.strptime(x["start_date"] , "%Y-%m-%d"))
+        out.sort(key = lambda x: time.strptime(x["start_date"], "%Y-%m-%d"))
         return out
         
     def getElimEventWinsByYear(self , year):
         import frcstat.Event as Event
-        if not hasattr(self , "getElimEventWins"):
+        if not self.getElimEventWins:
             self.getElimEventWins = {}
         if year in self.getElimEventWins:
             return self.getElimEventWins[year]
         self.getElimEventWins[year] = {}
-        for event in self.eventData:
+        for event in self.getEventData():
             if year == event["year"]:
                 ev = Event(event["key"])
                 teamMatches = ev.getTeamMatches(self.teamCode)
@@ -60,57 +89,94 @@ class Team:
         """
         Returns tuple of start year and end year, unless no districts, which then None
         """
-        if not self.districtData:
+        districtData = self.getDistrictData()
+        if not districtData:
             return None
 
         start = None
         end = None
-        for i in range(len(self.districtData)):
+        for i in range(len(districtData)):
             if i == 0:
-                start = self.districtData[i]["year"]
-                end = self.districtData[i]["year"]
+                start = districtData[i]["year"]
+                end = districtData[i]["year"]
 
             else:
-                start = min(start , self.districtData[i]["year"])
-                end = max(end , self.districtData[i]["year"])
-        return (start , end)
+                start = min(start, districtData[i]["year"])
+                end = max(end, districtData[i]["year"])
+        return start, end
 
-    def getDistrictAtYear(self , year):
-        if not self.districtData:
+    def getDistrictAtYear(self, year):
+        districtData = self.getDistrictData()
+        if not districtData:
             return None
 
-        for dm in self.districtData:
+        for dm in districtData:
             if dm["year"] == year:
                 return dm
 
         return None
 
-        
-    def loadData(self , cacheRefreshAggression):
+    def readValidityData(self):
+        return _Singleton_TBA_Client.dictToDefaultDict(_Singleton_TBA_Client.readTeamData(self.validityFile) , lambda:None)
+
+    def writeValidityData(self, validityData):
+        return _Singleton_TBA_Client.writeTeamData(self.validityFile, validityData)  # Write validity object to file
+
+    def loadData(self):
         """
             
         """
-        
-        #First get modified data to check if update needed
-        validityData = _Singleton_TBA_Client.dictToDefaultDict(_Singleton_TBA_Client.readTeamData(self.validityFile) , lambda:None)
-        
+
+        self.loadTeamData()
+        self.loadEventData()
+        self.loadAwardData()
+        self.loadDistrictData()
+
+    def loadTeamData(self):
+        validityData = self.readValidityData()
+
         teamDataName = "{}-data".format(self.teamCode)
         teamDataRequest = "team/{}".format(self.teamCode)
-        self.teamData = _Singleton_TBA_Client.makeSmartRequest(teamDataName , teamDataRequest , validityData , self , cacheRefreshAggression)
-        
-        teamEventName = "{}-events".format(self.teamCode) #common name
-        teamEventRequest = "team/{}/events".format(self.teamCode)
-        self.eventData = _Singleton_TBA_Client.makeSmartRequest(teamEventName , teamEventRequest , validityData , self , cacheRefreshAggression)
-        
-        teamAwardName = "{}-awards".format(self.teamCode) #common name
-        teamAwardRequest = "team/{}/awards".format(self.teamCode)
-        self.awardData = _Singleton_TBA_Client.makeSmartRequest(teamAwardName , teamAwardRequest , validityData , self , cacheRefreshAggression)
+        self.teamData = _Singleton_TBA_Client.makeSmartRequest(teamDataName, teamDataRequest, validityData, self,
+                                                               self.cacheRefreshAggression)
 
-        districtDataName = "{}-districts".format(self.teamCode) #common name
+        self.writeValidityData(validityData)
+
+    def loadEventData(self):
+        validityData = self.readValidityData()
+
+        teamEventName = "{}-events".format(self.teamCode)  # common name
+        teamEventRequest = "team/{}/events".format(self.teamCode)
+        self.eventData = _Singleton_TBA_Client.makeSmartRequest(teamEventName, teamEventRequest, validityData, self,
+                                                                self.cacheRefreshAggression)
+
+        self.writeValidityData(validityData)
+
+    def loadAwardData(self):
+        validityData = self.readValidityData()
+        teamAwardName = "{}-awards".format(self.teamCode)  # common name
+        teamAwardRequest = "team/{}/awards".format(self.teamCode)
+        self.awardData = _Singleton_TBA_Client.makeSmartRequest(teamAwardName, teamAwardRequest, validityData, self,
+                                                                self.cacheRefreshAggression)
+        self.writeValidityData(validityData)
+
+
+    def loadDistrictData(self):
+        validityData = self.readValidityData()
+        districtDataName = "{}-districts".format(self.teamCode)  # common name
         districtDataRequest = "team/{}/districts".format(self.teamCode)
-        self.districtData = _Singleton_TBA_Client.makeSmartRequest(districtDataName , districtDataRequest , validityData , self , cacheRefreshAggression)   
-            
-        _Singleton_TBA_Client.writeTeamData(self.validityFile , validityData) #Write validity object to file   
+        self.districtData = _Singleton_TBA_Client.makeSmartRequest(districtDataName, districtDataRequest, validityData,
+                                                                   self, self.cacheRefreshAggression)
+        self.writeValidityData(validityData)
+
+
+
+_teamShare = ObjectShare(Team)
+
+
+def getTeam(teamNumber, cacheRefreshAggression = 1):
+    return _teamShare.get(teamNumber, cacheRefreshAggression)
+
 
 def _Team_Set_TBA_Client(client):
     global _Singleton_TBA_Client
