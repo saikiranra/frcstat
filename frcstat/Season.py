@@ -1,4 +1,5 @@
 from collections import defaultdict
+from copy import copy
 from .ObjectShare import ObjectShare
 
 _Singleton_TBA_Client = None
@@ -12,6 +13,7 @@ class Season:
         '''
         self.year = year
         self.validityFile = str(year) + "-valid"
+        self._old_validity_data = None
         self.loadData(cacheRefreshAggression)
         
 
@@ -86,12 +88,14 @@ class Season:
         
     def loadData(self , cacheRefreshAggression):
         validityData = _Singleton_TBA_Client.dictToDefaultDict(_Singleton_TBA_Client.readSeasonData(self.validityFile) , lambda:None)
+        self._old_validity_data = copy(validityData)
         
         eventObjName = "{}-data".format(str(self.year))
         eventRequest = "events/{}".format(str(self.year))
         self.events = _Singleton_TBA_Client.makeSmartRequest(eventObjName , eventRequest , validityData , self , cacheRefreshAggression)
             
-        _Singleton_TBA_Client.writeSeasonData(self.validityFile , validityData) #Write validity object to file
+        if self._old_validity_data != validityData:
+            _Singleton_TBA_Client.writeSeasonData(self.validityFile , validityData) #Write validity object to file
 
 
 _seasonShare = ObjectShare(Season)

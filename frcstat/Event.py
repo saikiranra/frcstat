@@ -2,6 +2,7 @@ import re
 import frcstat.Team as Team
 import numpy as np
 import scipy.linalg as lin
+from copy import copy
 from scipy.special import erfinv
 from collections import defaultdict
 from .ObjectShare import ObjectShare
@@ -46,6 +47,7 @@ class Event:
         self.qualMatchAmount = None
 
         self.validityFile = code + "-valid"
+        self._old_validity_data = None
 
     def getMatchData(self):
         if not self.fetchedMatches:
@@ -116,7 +118,9 @@ class Event:
         return self.coprs
 
     def getTeamAmount(self):
-        return len(self.getTeamList())
+        if self.getTeamList():
+            return len(self.teamList)
+        return len(self.rawTeamList)
 
     def getQualMatchAmount(self):
         if not self.qualMatchAmount:
@@ -653,14 +657,19 @@ class Event:
         """
         out = {}
         teamList = self.getTeamList()
+        if teamList == None:
+            teamList = self.rawTeamList
         for i in range(self.getTeamAmount()):
             out[teamList[i]] = i
         return out
 
     def readValidityData(self):
-        return _Singleton_TBA_Client.dictToDefaultDict(_Singleton_TBA_Client.readEventData(self.validityFile) , lambda:None)
+        self._old_validity_data =  _Singleton_TBA_Client.dictToDefaultDict(_Singleton_TBA_Client.readEventData(self.validityFile) , lambda:None)
+        return copy(self._old_validity_data)
 
     def writeValidityData(self, validityData):
+        if self._old_validity_data == validityData:
+            return True
         return _Singleton_TBA_Client.writeEventData(self.validityFile , validityData)
 
     def loadData(self):
@@ -723,7 +732,10 @@ class Event:
         teamListRequest = "event/{}/teams/keys".format(self.eventCode)
         self.rawTeamList = _Singleton_TBA_Client.makeSmartRequest(teamListObjName, teamListRequest, validityData, self,
                                                                   self.cacheRefreshAggression)
-        self.teamList = self.getPlayingTeamList(True)
+        try:
+            self.teamList = self.getPlayingTeamList(True)
+        except:
+            self.teamList = None
         self.writeValidityData(validityData)
 
     def loadDistrictPoints(self):

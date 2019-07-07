@@ -15,10 +15,10 @@ from .Team import Team
 class TBA_Client:
     def __init__(self , tbakey = None):
         self.saveDir = os.path.dirname(os.path.abspath(__file__))
-        self.localDataDir = self.saveDir +r"/localData/"
-        self.teamDir = self.localDataDir + r"teams/"
-        self.eventDir = self.localDataDir + r"events/"
-        self.seasonDir = self.localDataDir + "seasons/"
+        self.localDataDir = os.path.join(self.saveDir , "localData")
+        self.teamDir   = os.path.join(self.localDataDir , "teams")
+        self.eventDir  = os.path.join(self.localDataDir , "events")
+        self.seasonDir = os.path.join(self.localDataDir , "seasons")
         
         self.keys = API_Keys(tbakey)
         self.apiURL = r"https://www.thebluealliance.com/api/v3/"
@@ -60,8 +60,8 @@ class TBA_Client:
         """
             file - File name in season/ .json will be appended
         """
-        fname = self.seasonDir + file + ".json"
-        self.readData(fname)
+        fname = os.path.join(self.seasonDir , file + ".json")
+        return self.readData(fname)
         
     def writeSeasonData(self , file , data):
         """
@@ -69,7 +69,7 @@ class TBA_Client:
             data - Python data structure to be written to file (Will be converted to JSON object string)
         """
         success = False
-        fname = self.seasonDir + file + ".json"
+        fname = os.path.join(self.seasonDir , file + ".json")
         with open(fname , 'w') as fp:
             fp.write(json.dumps(data))
             success = True
@@ -79,8 +79,8 @@ class TBA_Client:
         """
             file - File name in season/ .json will be appended
         """
-        fname = self.teamDir + file + ".json"
-        self.readData(fname)
+        fname = os.path.join(self.teamDir , file + ".json")
+        return self.readData(fname)
         
     def writeTeamData(self , file , data):
         """
@@ -88,7 +88,7 @@ class TBA_Client:
             data - Python data structure to be written to file (Will be converted to JSON object string)
         """
         success = False
-        fname = self.teamDir + file + ".json"
+        fname = os.path.join(self.teamDir , file + ".json")
         with open(fname , 'w') as fp:
             fp.write(json.dumps(data))
             success = True
@@ -98,8 +98,8 @@ class TBA_Client:
         """
             file - File name in season/ .json will be appended
         """
-        fname = self.eventDir + file + ".json"
-        self.readData(fname)
+        fname = os.path.join(self.eventDir , file + ".json")
+        return self.readData(fname)
         
     def writeEventData(self , file , data):
         """
@@ -107,7 +107,7 @@ class TBA_Client:
             data - Python data structure to be written to file (Will be converted to JSON object string)
         """
         success = False
-        fname = self.eventDir + file + ".json"
+        fname = os.path.join(self.eventDir , file + ".json")
         with open(fname , 'w') as fp:
             fp.write(json.dumps(data))
             success = True

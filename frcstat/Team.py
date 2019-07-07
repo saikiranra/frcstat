@@ -1,4 +1,6 @@
 import time
+from collections import defaultdict
+from copy import copy
 from .ObjectShare import ObjectShare
 
 _Singleton_TBA_Client = None
@@ -27,6 +29,7 @@ class Team:
 
         self.getElimEventWins = None
 
+        self._old_validity_data = None
 
     def getTeamData(self):
         if not self.teamData:
@@ -117,9 +120,12 @@ class Team:
         return None
 
     def readValidityData(self):
-        return _Singleton_TBA_Client.dictToDefaultDict(_Singleton_TBA_Client.readTeamData(self.validityFile) , lambda:None)
+        self._old_validity_data = _Singleton_TBA_Client.dictToDefaultDict(_Singleton_TBA_Client.readTeamData(self.validityFile) , lambda:None)
+        return copy(self._old_validity_data)
 
     def writeValidityData(self, validityData):
+        if self._old_validity_data == validityData:
+            return True
         return _Singleton_TBA_Client.writeTeamData(self.validityFile, validityData)  # Write validity object to file
 
     def loadData(self):
@@ -136,7 +142,7 @@ class Team:
         validityData = self.readValidityData()
 
         teamDataName = "{}-data".format(self.teamCode)
-        teamDataRequest = "team/{}".format(self.teamCode)
+        teamDataRequest = r"team/{}".format(self.teamCode)
         self.teamData = _Singleton_TBA_Client.makeSmartRequest(teamDataName, teamDataRequest, validityData, self,
                                                                self.cacheRefreshAggression)
 
@@ -146,7 +152,7 @@ class Team:
         validityData = self.readValidityData()
 
         teamEventName = "{}-events".format(self.teamCode)  # common name
-        teamEventRequest = "team/{}/events".format(self.teamCode)
+        teamEventRequest = r"team/{}/events".format(self.teamCode)
         self.eventData = _Singleton_TBA_Client.makeSmartRequest(teamEventName, teamEventRequest, validityData, self,
                                                                 self.cacheRefreshAggression)
 
@@ -155,7 +161,7 @@ class Team:
     def loadAwardData(self):
         validityData = self.readValidityData()
         teamAwardName = "{}-awards".format(self.teamCode)  # common name
-        teamAwardRequest = "team/{}/awards".format(self.teamCode)
+        teamAwardRequest = r"team/{}/awards".format(self.teamCode)
         self.awardData = _Singleton_TBA_Client.makeSmartRequest(teamAwardName, teamAwardRequest, validityData, self,
                                                                 self.cacheRefreshAggression)
         self.writeValidityData(validityData)
@@ -164,7 +170,7 @@ class Team:
     def loadDistrictData(self):
         validityData = self.readValidityData()
         districtDataName = "{}-districts".format(self.teamCode)  # common name
-        districtDataRequest = "team/{}/districts".format(self.teamCode)
+        districtDataRequest = r"team/{}/districts".format(self.teamCode)
         self.districtData = _Singleton_TBA_Client.makeSmartRequest(districtDataName, districtDataRequest, validityData,
                                                                    self, self.cacheRefreshAggression)
         self.writeValidityData(validityData)
