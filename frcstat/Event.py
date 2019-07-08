@@ -66,7 +66,7 @@ class Event:
             self.loadDistrictPoints()
         return self.districtPoints
 
-    def getAwards(self):
+    def getAwardsObj(self):
         if not self.awards:
             self.loadAwards()
         return self.awards
@@ -403,7 +403,7 @@ class Event:
                     
         return alliances
 
-    def getDistrictPoints(self , teamNumber , rookieYear = None, includePlayoffs = True):
+    def getTeamDistrictPoints(self , teamNumber , rookieYear = None, includePlayoffs = True):
         code = teamNumber
         if type(teamNumber) == int:
             code = "frc"+str(teamNumber)
@@ -433,7 +433,7 @@ class Event:
             """
 
             #awards points
-            awards = self.getAwards()
+            awards = self.getAwardsObj()
             for award in awards:
                 isRecipient = False
                 for recipient in award["recipient_list"]:
@@ -823,7 +823,7 @@ class Event:
             awards['frc2791'] = set([1, 16]), for winner and industrial design
         """
         awardsDict = {teamKey: set([]) for teamKey in self.getRawTeamList()}
-        awards = self.getAwards()
+        awards = self.getAwardsObj()
         if awards is None:
             return {}
         for award in awards:
