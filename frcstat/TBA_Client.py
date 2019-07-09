@@ -51,7 +51,7 @@ class TBA_Client:
             with open(fname) as fp:
                 try:
                     out = json.loads(fp.read())
-                except JSONDecodeError:
+                except json.decoder.JSONDecodeError:
                     if __debug__:
                         print(fname + " failed JSON decoding.")
         return out
