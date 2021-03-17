@@ -7,7 +7,7 @@ AUTHOR = "Saikiran Ramanan"
 EMAIL = "saikiranra@gmail.com"
 DESCRIPTION = "FRC Statistics Library using TBA to pull data"
 PACKAGES = ["frcstat" , "tests"]
-REQUIRES = ["numpy" , "scipy" , "requests"]
+REQUIRES = ["requests" , "scipy" ,  "numpy"]
 
 
 
